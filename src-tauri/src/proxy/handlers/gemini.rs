@@ -192,7 +192,7 @@ pub async fn handle_generate(
             // 只有明确包含 "QUOTA_EXHAUSTED" 才停止，避免误判上游的频率限制提示 (如 "check quota")
             if status_code == 429 && error_text.contains("QUOTA_EXHAUSTED") {
                 error!("Gemini Quota exhausted (429) on account {} attempt {}/{}, stopping to protect pool.", email, attempt + 1, max_attempts);
-                return Err((status, error_text));
+                return Ok((status, [("X-Account-Email", email.as_str())], error_text).into_response());
             }
 
             tracing::warn!("Gemini Upstream {} on account {} attempt {}/{}, rotating account", status_code, email, attempt + 1, max_attempts);
@@ -201,7 +201,7 @@ pub async fn handle_generate(
  
         // 404 等由于模型配置或路径错误的 HTTP 异常，直接报错，不进行无效轮换
         error!("Gemini Upstream non-retryable error {}: {}", status_code, error_text);
-        return Err((status, error_text));
+        return Ok((status, [("X-Account-Email", email.as_str())], error_text).into_response());
     }
 
     Ok((StatusCode::TOO_MANY_REQUESTS, format!("All accounts exhausted. Last error: {}", last_error)).into_response())

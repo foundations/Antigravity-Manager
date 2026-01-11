@@ -227,7 +227,7 @@ pub async fn handle_chat_completions(
                     attempt + 1,
                     max_attempts
                 );
-                return Err((status, error_text));
+                return Ok((status, [("X-Account-Email", email.as_str())], error_text).into_response());
             }
 
             // 3. 其他限流或服务器过载情况，轮换账号
@@ -258,7 +258,7 @@ pub async fn handle_chat_completions(
             "OpenAI Upstream non-retryable error {} on account {}: {}",
             status_code, email, error_text
         );
-        return Err((status, error_text));
+        return Ok((status, [("X-Account-Email", email.as_str())], error_text).into_response());
     }
 
     // 所有尝试均失败

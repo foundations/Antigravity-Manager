@@ -134,14 +134,27 @@ pub async fn monitor_middleware(
             
             if let Ok(full_tail) = std::str::from_utf8(&last_few_bytes) {
                 for line in full_tail.lines().rev() {
-                    if line.starts_with("data: ") && line.contains("\"usage\"") {
+                    if line.starts_with("data: ") && (line.contains("\"usage\"") || line.contains("\"usageMetadata\"")) {
                         let json_str = line.trim_start_matches("data: ").trim();
                         if let Ok(json) = serde_json::from_str::<Value>(json_str) {
-                            if let Some(usage) = json.get("usage") {
-                                log.input_tokens = usage.get("prompt_tokens").or(usage.get("input_tokens")).and_then(|v| v.as_u64()).map(|v| v as u32);
-                                log.output_tokens = usage.get("completion_tokens").or(usage.get("output_tokens")).and_then(|v| v.as_u64()).map(|v| v as u32);
+                            // 支持 OpenAI "usage" 或 Gemini "usageMetadata"
+                            if let Some(usage) = json.get("usage").or(json.get("usageMetadata")) {
+                                log.input_tokens = usage.get("prompt_tokens")
+                                    .or(usage.get("input_tokens"))
+                                    .or(usage.get("promptTokenCount"))
+                                    .and_then(|v| v.as_u64())
+                                    .map(|v| v as u32);
+                                log.output_tokens = usage.get("completion_tokens")
+                                    .or(usage.get("output_tokens"))
+                                    .or(usage.get("candidatesTokenCount"))
+                                    .and_then(|v| v.as_u64())
+                                    .map(|v| v as u32);
+                                
                                 if log.input_tokens.is_none() && log.output_tokens.is_none() {
-                                    log.output_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).map(|v| v as u32);
+                                    log.output_tokens = usage.get("total_tokens")
+                                        .or(usage.get("totalTokenCount"))
+                                        .and_then(|v| v.as_u64())
+                                        .map(|v| v as u32);
                                 }
                                 break;
                             }
@@ -163,11 +176,24 @@ pub async fn monitor_middleware(
             Ok(bytes) => {
                 if let Ok(s) = std::str::from_utf8(&bytes) {
                     if let Ok(json) = serde_json::from_str::<Value>(&s) {
-                        if let Some(usage) = json.get("usage") {
-                            log.input_tokens = usage.get("prompt_tokens").or(usage.get("input_tokens")).and_then(|v| v.as_u64()).map(|v| v as u32);
-                            log.output_tokens = usage.get("completion_tokens").or(usage.get("output_tokens")).and_then(|v| v.as_u64()).map(|v| v as u32);
+                        // 支持 OpenAI "usage" 或 Gemini "usageMetadata"
+                        if let Some(usage) = json.get("usage").or(json.get("usageMetadata")) {
+                            log.input_tokens = usage.get("prompt_tokens")
+                                .or(usage.get("input_tokens"))
+                                .or(usage.get("promptTokenCount"))
+                                .and_then(|v| v.as_u64())
+                                .map(|v| v as u32);
+                            log.output_tokens = usage.get("completion_tokens")
+                                .or(usage.get("output_tokens"))
+                                .or(usage.get("candidatesTokenCount"))
+                                .and_then(|v| v.as_u64())
+                                .map(|v| v as u32);
+                                
                             if log.input_tokens.is_none() && log.output_tokens.is_none() {
-                                log.output_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).map(|v| v as u32);
+                                log.output_tokens = usage.get("total_tokens")
+                                    .or(usage.get("totalTokenCount"))
+                                    .and_then(|v| v.as_u64())
+                                    .map(|v| v as u32);
                             }
                         }
                     }

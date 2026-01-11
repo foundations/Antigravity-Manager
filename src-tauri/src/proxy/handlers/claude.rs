@@ -853,7 +853,7 @@ pub async fn handle_messages(
         } else {
             // 不可重试的错误，直接返回
             error!("[{}] Non-retryable error {}: {}", trace_id, status_code, error_text);
-            return (status, error_text).into_response();
+            return (status, [("X-Account-Email", email.as_str())], error_text).into_response();
         }
     }
     
